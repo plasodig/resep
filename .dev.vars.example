@@ -1,0 +1,5 @@
+# Copy file ini ke .dev.vars (jangan commit). Dipakai saat `wrangler dev` lokal.
+ADMIN_PASSWORD="ganti-password-admin"
+SESSION_SECRET="ganti-string-acak-minimal-32-karakter-untuk-hmac"
+ACCOUNT_POOL_JSON='[{"id":1,"ns":"...","tk":"..."}]'
+R2_PUBLIC_BASE=""

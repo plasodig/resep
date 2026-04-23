@@ -1,0 +1,27 @@
+name = "resep-dashboard"
+main = "src/index.ts"
+compatibility_date = "2024-12-18"
+compatibility_flags = ["nodejs_compat"]
+
+# Public endpoints (mobile app + admin UI) — no rate limit needed for free tier.
+# Workers free plan: 100k requests/day. Cukup untuk admin sehari-hari + ratusan instalasi mobile.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "resep-db"
+# Ganti database_id setelah `wrangler d1 create resep-db`
+database_id = "REPLACE_WITH_REAL_D1_ID"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "resep-images"
+
+[vars]
+# Public R2 base URL (set setelah enable r2.dev atau custom domain).
+# Contoh: "https://pub-xxxxxxxx.r2.dev" atau "https://images.domain.com"
+R2_PUBLIC_BASE = ""
+
+# Secrets (di-set via `wrangler secret put`):
+#   ADMIN_PASSWORD       — password login dashboard
+#   SESSION_SECRET       — string acak min 32 char untuk sign cookie
+#   ACCOUNT_POOL_JSON    — isi data.json (64 akun) sebagai single-line string
