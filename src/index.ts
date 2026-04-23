@@ -13,6 +13,8 @@ import { authRoutes } from "./routes/auth";
 import { publicRoutes } from "./routes/public";
 import type { Bindings } from "./types";
 
+import { autoProcessDrafts } from "./service/autobot";
+
 const app = new Hono<{ Bindings: Bindings }>();
 
 app.use("*", logger());
@@ -28,4 +30,10 @@ app.onError((err, c) => {
   return c.text(`Error: ${err.message}`, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: any, env: Bindings, ctx: any) {
+    console.log("🔔 CRON TRIGGERED at " + new Date().toISOString());
+    ctx.waitUntil(autoProcessDrafts(env));
+  },
+};

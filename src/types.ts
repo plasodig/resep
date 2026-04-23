@@ -14,9 +14,10 @@ export type RecipeStatus = "draft" | "generated" | "published";
 
 export interface Bindings {
   DB: D1Database;
-  IMAGES: R2Bucket;
-  // vars
-  R2_PUBLIC_BASE: string;
+  IMAGES: KVNamespace;
+  // vars (R2_PUBLIC_BASE dihapus)
+  AI_POOL_URL: string;
+  RECIPES_SYNC_URL: string;
   // secrets
   ADMIN_PASSWORD: string;
   SESSION_SECRET: string;

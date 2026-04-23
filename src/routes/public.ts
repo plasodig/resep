@@ -23,7 +23,7 @@ publicRoutes.get("/api/recipes", async (c) => {
     cookingTimeMinutes: r.cooking_time_minutes,
     servings: r.servings,
     tags: r.tags_csv ? r.tags_csv.split(",") : [],
-    imageUrl: imageUrlFor(r.image_key, c.env.R2_PUBLIC_BASE),
+    imageUrl: imageUrlFor(r.image_key),
     updatedAt: r.updated_at,
     publishedAt: r.published_at,
   }));
@@ -36,7 +36,7 @@ publicRoutes.get("/api/recipes", async (c) => {
 
 publicRoutes.get("/api/recipes/:id", async (c) => {
   const id = c.req.param("id");
-  const full = await getRecipeFull(c.env.DB, id, c.env.R2_PUBLIC_BASE);
+  const full = await getRecipeFull(c.env.DB, id, "");
   if (!full || full.recipe.status !== "published") {
     return c.json({ error: "not_found" }, 404);
   }
@@ -63,6 +63,22 @@ publicRoutes.get("/api/recipes/:id", async (c) => {
 
 // Healthcheck sederhana
 publicRoutes.get("/api/health", (c) => c.json({ ok: true, ts: Date.now() }));
+
+// Proxy untuk menyajikan gambar dari KV (pengganti R2 public URL)
+publicRoutes.get("/api/images/recipes/:filename", async (c) => {
+  const filename = c.req.param("filename");
+  const key = `recipes/${filename}`;
+  const { value, metadata } = await c.env.IMAGES.getWithMetadata<{ contentType: string }>(key, "arrayBuffer");
+
+  if (!value) return c.notFound();
+
+  return new Response(value, {
+    headers: {
+      "Content-Type": metadata?.contentType || "image/png",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
+});
 
 function latestVersion(rows: { updated_at: number }[]): number {
   return rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), 0);

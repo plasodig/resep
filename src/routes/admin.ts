@@ -5,16 +5,19 @@ import {
   saveGeneratedContent,
   setImageKey,
   setStatus,
+  syncRecipes,
   updateMeta,
 } from "../db";
 import { generateImage, generateRecipe } from "../ai/client";
-import { PoolIterator, parseAccountPool, QuotaExhaustedError } from "../ai/pool";
-import { uploadRecipeImage } from "../storage/r2";
+import { PoolIterator, getAccountPool, QuotaExhaustedError } from "../ai/pool";
+import { uploadRecipeImage } from "../storage/kv";
 import type { Bindings, Category } from "../types";
 import { dashboardView } from "../views/dashboard";
 import { detailView } from "../views/detail";
 
 export const adminRoutes = new Hono<{ Bindings: Bindings }>();
+
+import { autoProcessDrafts } from "../service/autobot";
 
 adminRoutes.get("/", async (c) => {
   const rows = await listRecipes(c.env.DB);
@@ -22,9 +25,27 @@ adminRoutes.get("/", async (c) => {
   return c.html(dashboardView(rows, flash));
 });
 
+adminRoutes.post("/sync", async (c) => {
+  try {
+    const res = await fetch(c.env.RECIPES_SYNC_URL);
+    if (!res.ok) throw new Error(`GAS returned ${res.status}`);
+    const data = await res.json() as any[];
+    const result = await syncRecipes(c.env.DB, data);
+    return c.redirect(`/?ok=${encodeURIComponent(`Sync berhasil: ${result.added} resep baru ditambahkan.`)}`);
+  } catch (e) {
+    return c.redirect(`/?err=${encodeURIComponent(errMsg("Sync gagal", e))}`);
+  }
+});
+
+adminRoutes.post("/autobot/run", async (c) => {
+  // Jalankan di background supaya browser bisa langsung di-close
+  c.executionCtx.waitUntil(autoProcessDrafts(c.env));
+  return c.redirect("/?ok=" + encodeURIComponent("Autobot dijalankan di background server. Proses akan berjalan otomatis."));
+});
+
 adminRoutes.get("/recipes/:id", async (c) => {
   const id = c.req.param("id");
-  const full = await getRecipeFull(c.env.DB, id, c.env.R2_PUBLIC_BASE);
+  const full = await getRecipeFull(c.env.DB, id, "");
   if (!full) return c.notFound();
   const flash = readFlash(c.req.query("ok"), c.req.query("err"));
   return c.html(detailView(full, flash));
@@ -47,10 +68,11 @@ adminRoutes.post("/recipes/:id/update", async (c) => {
 
 adminRoutes.post("/recipes/:id/generate-text", async (c) => {
   const id = c.req.param("id");
-  const full = await getRecipeFull(c.env.DB, id, c.env.R2_PUBLIC_BASE);
+  const full = await getRecipeFull(c.env.DB, id, "");
   if (!full) return c.notFound();
   try {
-    const pool = new PoolIterator(parseAccountPool(c.env.ACCOUNT_POOL_JSON));
+    const slots = await getAccountPool(c.env.IMAGES, c.env.AI_POOL_URL, c.env.ACCOUNT_POOL_JSON);
+    const pool = new PoolIterator(slots);
     const content = await generateRecipe(pool, full.recipe.title, full.recipe.category);
     await saveGeneratedContent(c.env.DB, id, content);
     return c.redirect(`/recipes/${id}?ok=${encodeURIComponent("Teks resep berhasil di-generate.")}`);
@@ -61,10 +83,11 @@ adminRoutes.post("/recipes/:id/generate-text", async (c) => {
 
 adminRoutes.post("/recipes/:id/generate-image", async (c) => {
   const id = c.req.param("id");
-  const full = await getRecipeFull(c.env.DB, id, c.env.R2_PUBLIC_BASE);
+  const full = await getRecipeFull(c.env.DB, id, "");
   if (!full) return c.notFound();
   try {
-    const pool = new PoolIterator(parseAccountPool(c.env.ACCOUNT_POOL_JSON));
+    const slots = await getAccountPool(c.env.IMAGES, c.env.AI_POOL_URL, c.env.ACCOUNT_POOL_JSON);
+    const pool = new PoolIterator(slots);
     const image = await generateImage(pool, full.recipe.title, full.recipe.category);
     const key = await uploadRecipeImage(c.env.IMAGES, id, image);
     await setImageKey(c.env.DB, id, key);
@@ -76,11 +99,11 @@ adminRoutes.post("/recipes/:id/generate-image", async (c) => {
 
 adminRoutes.post("/recipes/:id/generate-all", async (c) => {
   const id = c.req.param("id");
-  const full = await getRecipeFull(c.env.DB, id, c.env.R2_PUBLIC_BASE);
+  const full = await getRecipeFull(c.env.DB, id, "");
   if (!full) return c.notFound();
   const errors: string[] = [];
   // Pakai 2 PoolIterator terpisah supaya kegagalan teks tidak mempengaruhi rotasi gambar.
-  const pool = parseAccountPool(c.env.ACCOUNT_POOL_JSON);
+  const pool = await getAccountPool(c.env.IMAGES, c.env.AI_POOL_URL, c.env.ACCOUNT_POOL_JSON);
 
   // Jalankan paralel — sama persis dengan strategi runtime AI lama di Kotlin.
   const [textResult, imageResult] = await Promise.allSettled([

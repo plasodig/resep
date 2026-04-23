@@ -17,10 +17,20 @@ export function dashboardView(rows: RecipeRow[], flash?: { kind: "ok" | "error";
       : ""}
 
     <div class="meta-row">
-      <span><strong>${rows.length}</strong> total</span>
-      <span><span class="badge badge-draft">draft</span> ${counts.draft}</span>
-      <span><span class="badge badge-generated">generated</span> ${counts.generated}</span>
-      <span><span class="badge badge-published">published</span> ${counts.published}</span>
+      <div>
+        <span><strong>${rows.length}</strong> total</span>
+        <span><span class="badge badge-draft">draft</span> ${counts.draft}</span>
+        <span><span class="badge badge-generated">generated</span> ${counts.generated}</span>
+        <span><span class="badge badge-published">published</span> ${counts.published}</span>
+      </div>
+      <div class="actions">
+        <form method="post" action="/sync">
+          <button class="btn" type="submit">🔄 Sinkronisasi Judul</button>
+        </form>
+        <form method="post" action="/autobot/run">
+          <button class="btn btn-primary" type="submit">⚡ Generate All (Background)</button>
+        </form>
+      </div>
     </div>
 
     <table>
@@ -36,7 +46,7 @@ export function dashboardView(rows: RecipeRow[], flash?: { kind: "ok" | "error";
       </thead>
       <tbody>
         ${rows.map(
-          (r) => html`
+        (r) => html`
             <tr>
               <td><a href="/recipes/${r.id}"><strong>${r.title}</strong></a></td>
               <td>${r.category}</td>
@@ -47,15 +57,15 @@ export function dashboardView(rows: RecipeRow[], flash?: { kind: "ok" | "error";
                 <div class="row-actions">
                   <a class="btn" href="/recipes/${r.id}">Detail</a>
                   ${r.status === "draft"
-                    ? html`<form class="inline" method="post" action="/recipes/${r.id}/generate-all">
+            ? html`<form class="inline" method="post" action="/recipes/${r.id}/generate-all">
                         <button class="btn btn-primary" type="submit">Generate</button>
                       </form>`
-                    : ""}
+            : ""}
                 </div>
               </td>
             </tr>
           `,
-        )}
+      )}
       </tbody>
     </table>
   `;

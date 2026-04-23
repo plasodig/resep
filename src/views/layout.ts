@@ -99,5 +99,6 @@ const BASE_CSS = `
   ul.ingredients { list-style: none; padding: 0; margin: 0; }
   ul.ingredients li { padding: 4px 0; border-bottom: 1px dotted var(--border); display: flex; justify-content: space-between; }
   ul.ingredients li:last-child { border-bottom: none; }
-  .meta-row { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .meta-row { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 13px; margin-bottom: 12px;
+              justify-content: space-between; align-items: center; }
 `;

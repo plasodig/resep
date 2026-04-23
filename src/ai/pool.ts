@@ -18,6 +18,49 @@ interface RawSlot {
   api_key?: string;
 }
 
+export async function getAccountPool(
+  kv: KVNamespace,
+  url: string,
+  backupJson?: string
+): Promise<AccountSlot[]> {
+  const CACHE_KEY = "ca_ai_pool";
+
+  // 1. Coba ambil dari KV dulu (cache 1 jam)
+  const cached = await kv.get(CACHE_KEY);
+  if (cached) {
+    try {
+      return parseAccountPool(cached);
+    } catch (e) {
+      console.warn("Cached AI pool invalid, refetching...", e);
+    }
+  }
+
+  // 2. Fetch dari Google Apps Script
+  if (url) {
+    try {
+      console.log("Fetching AI pool from GAS...");
+      const res = await fetch(url);
+      if (res.ok) {
+        const text = await res.text();
+        // Validasi JSON sebelum simpan
+        parseAccountPool(text);
+        // Simpan ke KV (cache expire 1 jam / 3600s)
+        await kv.put(CACHE_KEY, text, { expirationTtl: 3600 });
+        return parseAccountPool(text);
+      }
+    } catch (e) {
+      console.error("Gagal fetch AI pool dari URL:", e);
+    }
+  }
+
+  // 3. Fallback ke secret/backup jika URL gagal
+  if (backupJson) {
+    return parseAccountPool(backupJson);
+  }
+
+  throw new Error("Tidak ada data AI Pool (URL gagal & Backup kosong)");
+}
+
 export function parseAccountPool(json: string): AccountSlot[] {
   const raw = JSON.parse(json) as RawSlot[];
   if (!Array.isArray(raw) || raw.length === 0) {

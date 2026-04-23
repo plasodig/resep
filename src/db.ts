@@ -56,11 +56,10 @@ export async function getRecipeFull(
   };
 }
 
-export function imageUrlFor(imageKey: string | null, publicBase: string): string | null {
+export function imageUrlFor(imageKey: string | null, _publicBase?: string): string | null {
   if (!imageKey) return null;
-  if (!publicBase) return null;
-  const base = publicBase.endsWith("/") ? publicBase.slice(0, -1) : publicBase;
-  return `${base}/${imageKey}`;
+  // KV tidak punya public URL langsung, jadi kita arahkan ke worker endpoint kita sendiri.
+  return `/api/images/${imageKey}`;
 }
 
 export async function saveGeneratedContent(
@@ -173,4 +172,39 @@ export async function updateMeta(
   values.push(Date.now());
   values.push(id);
   await db.prepare(`UPDATE recipes SET ${fields.join(", ")} WHERE id = ?`).bind(...values).run();
+}
+
+export async function syncRecipes(
+  db: D1Database,
+  data: { name: string; category: Category }[]
+): Promise<{ added: number; skipped: number }> {
+  let added = 0;
+  let skipped = 0;
+
+  // Kita gunakan batch untuk efisiensi. 
+  // Strategi: INSERT OR IGNORE berdasarkan ID (ID di-generate dari nama yang di-slugify).
+  const stmts: D1PreparedStatement[] = [];
+
+  for (const item of data) {
+    const slug = item.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+
+    if (!slug) continue;
+
+    stmts.push(
+      db
+        .prepare(`INSERT OR IGNORE INTO recipes (id, title, category, status, updated_at) VALUES (?, ?, ?, 'draft', ?)`)
+        .bind(slug, item.name, item.category, Date.now())
+    );
+  }
+
+  const results = await db.batch(stmts);
+  results.forEach(r => {
+    if (r.meta.changes > 0) added++;
+    else skipped++;
+  });
+
+  return { added, skipped };
 }
