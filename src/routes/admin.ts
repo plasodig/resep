@@ -121,12 +121,16 @@ adminRoutes.post("/recipes/:id/generate-all", async (c) => {
   if (textResult.status === "rejected") errors.push(errMsg("teks", textResult.reason));
   if (imageResult.status === "rejected") errors.push(errMsg("gambar", imageResult.reason));
 
+  const isJson = c.req.header("Accept")?.includes("application/json");
+
   if (errors.length > 0) {
+    if (isJson) return c.json({ success: false, error: errors.join(" | ") }, 500);
     return c.redirect(`/admin/recipes/${id}?err=${encodeURIComponent(errors.join(" | "))}`);
   }
 
   // Otomatis publish jika sukses
   await setStatus(c.env.DB, id, "published");
+  if (isJson) return c.json({ success: true, status: "published" });
   return c.redirect(`/admin?ok=${encodeURIComponent(`Teks + gambar untuk ${full.recipe.title} selesai di-generate dan otomatis di-publish.`)}`);
 });
 

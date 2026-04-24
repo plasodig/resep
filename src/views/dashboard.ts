@@ -68,6 +68,58 @@ export function dashboardView(rows: RecipeRow[], flash?: { kind: "ok" | "error";
       )}
       </tbody>
     </table>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const generateForms = document.querySelectorAll("form.inline");
+        generateForms.forEach(form => {
+          if (form.action.includes("generate-all")) {
+            form.addEventListener("submit", async (e) => {
+              e.preventDefault();
+              const btn = form.querySelector("button");
+              if (btn.disabled) return;
+              
+              const originalText = btn.innerText;
+              btn.innerText = "Memproses...";
+              btn.disabled = true;
+
+              try {
+                const res = await fetch(form.action, {
+                  method: "POST",
+                  headers: { "Accept": "application/json" }
+                });
+                
+                const data = await res.json();
+                if (data.success) {
+                  // Update UI dynamically
+                  btn.innerText = "Selesai (Published)";
+                  btn.classList.replace("btn-primary", "btn-success");
+                  
+                  // Update status badge
+                  const tr = form.closest("tr");
+                  const badge = tr.querySelector(".badge");
+                  if (badge) {
+                    badge.className = "badge badge-published";
+                    badge.innerText = "published";
+                  }
+                  
+                  // Update checkmark for image
+                  const tdImg = tr.querySelectorAll("td")[3];
+                  if (tdImg) tdImg.innerText = "✓";
+                } else {
+                  alert("Gagal: " + (data.error || "Unknown error"));
+                  btn.innerText = originalText;
+                  btn.disabled = false;
+                }
+              } catch (err) {
+                alert("Koneksi gagal atau timeout.");
+                btn.innerText = originalText;
+                btn.disabled = false;
+              }
+            });
+          }
+        });
+      });
+    </script>
   `;
   return layout("Dashboard", body);
 }
