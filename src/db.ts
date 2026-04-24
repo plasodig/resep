@@ -28,6 +28,34 @@ export async function listPublishedRecipes(db: D1Database): Promise<RecipeRow[]>
   return results ?? [];
 }
 
+export async function listPublishedRecipesPaged(
+  db: D1Database,
+  opts: { category?: string; limit: number; offset: number },
+): Promise<RecipeRow[]> {
+  const limit = Math.max(1, Math.min(opts.limit, 100));
+  const offset = Math.max(0, opts.offset);
+  const sql = opts.category
+    ? `SELECT * FROM recipes WHERE status='published' AND category = ? ORDER BY title ASC LIMIT ? OFFSET ?`
+    : `SELECT * FROM recipes WHERE status='published' ORDER BY title ASC LIMIT ? OFFSET ?`;
+  const stmt = opts.category
+    ? db.prepare(sql).bind(opts.category, limit, offset)
+    : db.prepare(sql).bind(limit, offset);
+  const { results } = await stmt.all<RecipeRow>();
+  return results ?? [];
+}
+
+export async function countPublishedRecipes(
+  db: D1Database,
+  category?: string,
+): Promise<number> {
+  const sql = category
+    ? `SELECT COUNT(*) AS n FROM recipes WHERE status='published' AND category = ?`
+    : `SELECT COUNT(*) AS n FROM recipes WHERE status='published'`;
+  const stmt = category ? db.prepare(sql).bind(category) : db.prepare(sql);
+  const row = await stmt.first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
 export async function getRecipeFull(
   db: D1Database,
   id: string,

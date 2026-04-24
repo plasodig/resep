@@ -1,6 +1,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { getRecipeFull, imageUrlFor, listPublishedRecipes } from "../db";
+import {
+  countPublishedRecipes,
+  getRecipeFull,
+  imageUrlFor,
+  listPublishedRecipes,
+  listPublishedRecipesPaged,
+} from "../db";
 import type { Bindings } from "../types";
 import { landingPage, recipeDetailPage } from "../views/landing";
 
@@ -28,10 +34,24 @@ publicRoutes.get("/resep/:id", async (c) => {
   return c.html(recipeDetailPage(full));
 });
 
-// Manifest ringan: list semua resep published, tanpa ingredients/steps (hemat bandwidth).
-// Mobile app pakai ini untuk render list, lalu fetch detail saat user buka.
+// Manifest ringan: list resep published dengan pagination opsional.
+// Tanpa query params → return semua (backward compat).
+// Dengan ?limit= dan/atau ?offset= → server-side pagination (disarankan untuk mobile).
+// Filter ?category= untuk filter kategori di server.
 publicRoutes.get("/api/recipes", async (c) => {
-  const rows = await listPublishedRecipes(c.env.DB);
+  const qLimit = c.req.query("limit");
+  const qOffset = c.req.query("offset");
+  const qCategory = c.req.query("category") || undefined;
+  const paged = qLimit !== undefined || qOffset !== undefined;
+
+  const rows = paged
+    ? await listPublishedRecipesPaged(c.env.DB, {
+        category: qCategory,
+        limit: qLimit ? Math.max(1, Math.min(parseInt(qLimit, 10) || 10, 100)) : 10,
+        offset: qOffset ? Math.max(0, parseInt(qOffset, 10) || 0) : 0,
+      })
+    : await listPublishedRecipes(c.env.DB);
+
   const data = rows.map((r) => ({
     id: r.id,
     title: r.title,
@@ -45,8 +65,18 @@ publicRoutes.get("/api/recipes", async (c) => {
     updatedAt: r.updated_at,
     publishedAt: r.published_at,
   }));
+
+  const total = paged ? await countPublishedRecipes(c.env.DB, qCategory) : data.length;
+  const effLimit = paged
+    ? (qLimit ? Math.max(1, Math.min(parseInt(qLimit, 10) || 10, 100)) : 10)
+    : data.length;
+  const effOffset = paged ? (qOffset ? Math.max(0, parseInt(qOffset, 10) || 0) : 0) : 0;
+
   return c.json({
     version: latestVersion(rows),
+    total,
+    limit: effLimit,
+    offset: effOffset,
     count: data.length,
     recipes: data,
   });

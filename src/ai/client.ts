@@ -7,7 +7,7 @@ import { SYSTEM_RECIPE, imagePrompt, userPromptRecipe } from "./prompts";
 
 const PRIMARY_TEXT_MODEL = "@cf/meta/llama-3-8b-instruct";
 const FALLBACK_TEXT_MODEL = "@cf/meta/llama-2-7b-chat-int8";
-const IMAGE_MODEL = "@cf/stabilityai/stable-diffusion-xl-base-1.0";
+const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 const MAX_ATTEMPTS = 4;
 
 interface CfEnvelope<T> {
@@ -173,7 +173,7 @@ export async function generateImage(
 ): Promise<GeneratedImageBytes> {
   const body = { 
     prompt: imagePrompt(title, category), 
-    steps: 20,
+    steps: 4,
     width: 512,
     height: 512
   };
