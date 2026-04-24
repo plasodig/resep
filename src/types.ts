@@ -77,3 +77,17 @@ export interface GeneratedImageBytes {
   extension: "png" | "jpg" | "webp";
   contentType: string;
 }
+
+export type RequestStatus = "processing" | "completed" | "failed";
+
+export interface GenerationRequestRow {
+  id: string;
+  query: string;
+  slug_target: string;
+  status: RequestStatus;
+  client_ip: string | null;
+  requested_at: number;
+  completed_at: number | null;
+  error_message: string | null;
+  resulting_recipe_id: string | null;
+}

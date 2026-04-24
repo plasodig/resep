@@ -39,3 +39,24 @@ CREATE TABLE IF NOT EXISTS cooking_steps (
     PRIMARY KEY (recipe_id, step_order),
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 );
+
+-- Job tracker auto-generate resep dari halaman pencarian mobile.
+-- User search miss → POST /api/requests → server insert processing + dispatch background →
+-- mobile poll GET /api/requests/:id sampai completed/failed.
+CREATE TABLE IF NOT EXISTS generation_requests (
+    id                   TEXT PRIMARY KEY,
+    query                TEXT NOT NULL,
+    slug_target          TEXT NOT NULL,
+    status               TEXT NOT NULL DEFAULT 'processing'
+                         CHECK (status IN ('processing','completed','failed')),
+    client_ip            TEXT,
+    requested_at         INTEGER NOT NULL,
+    completed_at         INTEGER,
+    error_message        TEXT,
+    resulting_recipe_id  TEXT REFERENCES recipes(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_requests_status
+    ON generation_requests(status, requested_at);
+CREATE INDEX IF NOT EXISTS idx_requests_slug
+    ON generation_requests(slug_target);

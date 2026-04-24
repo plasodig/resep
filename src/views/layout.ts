@@ -15,6 +15,7 @@ export function layout(title: string, body: HtmlEscapedString | Promise<HtmlEsca
     <a href="/admin" class="brand">Resep Dashboard</a>
     <nav>
       <a href="/admin">Daftar</a>
+      <a href="/admin/requests">Permintaan</a>
       <a href="/" target="_blank" rel="noopener">Landing Page</a>
       <a href="/api/recipes" target="_blank" rel="noopener">API publik</a>
       <form method="post" action="/logout" style="display:inline">
@@ -64,6 +65,7 @@ const BASE_CSS = `
   .badge-draft { background: var(--warn-soft); color: var(--warn); }
   .badge-generated { background: var(--primary-soft); color: var(--primary); }
   .badge-published { background: var(--ok-soft); color: var(--ok); }
+  .badge-danger { background: var(--danger-soft); color: var(--danger); }
   .btn { display: inline-block; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--border);
          background: var(--surface); cursor: pointer; font-size: 13px; text-decoration: none; color: var(--text); }
   .btn:hover { background: #f3f4f6; }

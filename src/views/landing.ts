@@ -97,6 +97,10 @@ export function landingPage(rows: RecipeRow[]) {
 
   <footer>
     <p>&copy; ${new Date().getFullYear()} Resep Nusantara — <a href="https://resep.plasodig.my.id">resep.plasodig.my.id</a></p>
+    <div style="margin-top: 12px; display: flex; justify-content: center; gap: 16px;">
+      <a href="/privacy-policy">Privacy Policy</a>
+      <a href="/contacts">Contact Us</a>
+    </div>
   </footer>
 
   <script>${raw(LANDING_JS)}</script>
@@ -178,6 +182,10 @@ export function recipeDetailPage(full: RecipeFull) {
 
   <footer>
     <p>&copy; ${new Date().getFullYear()} Resep Nusantara — <a href="https://resep.plasodig.my.id">resep.plasodig.my.id</a></p>
+    <div style="margin-top: 12px; display: flex; justify-content: center; gap: 16px;">
+      <a href="/privacy-policy">Privacy Policy</a>
+      <a href="/contacts">Contact Us</a>
+    </div>
   </footer>
 </body>
 </html>`;

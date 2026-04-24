@@ -2,17 +2,30 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import {
   countPublishedRecipes,
+  createProcessingRequest,
+  findProcessingRequestBySlug,
+  findRecipeById,
   getRecipeFull,
+  getRequest,
   imageUrlFor,
   listPublishedRecipes,
   listPublishedRecipesPaged,
+  slugifyQuery,
 } from "../db";
+import { rateLimit, clientIp } from "../middleware/rateLimit";
+import { processGenerationRequest } from "../service/generator";
+import { findSuggestions } from "../service/suggestions";
 import type { Bindings } from "../types";
 import { landingPage, recipeDetailPage } from "../views/landing";
+import { privacyPolicyPage, contactPage } from "../views/legal";
 
 export const publicRoutes = new Hono<{ Bindings: Bindings }>();
 
-publicRoutes.use("/api/*", cors({ origin: "*", allowMethods: ["GET"] }));
+publicRoutes.use("/api/*", cors({ origin: "*", allowMethods: ["GET", "POST"] }));
+
+// ── Legal Pages ──
+publicRoutes.get("/privacy-policy", (c) => c.html(privacyPolicyPage()));
+publicRoutes.get("/contacts", (c) => c.html(contactPage()));
 
 // ── Landing Page Publik ──
 publicRoutes.get("/", async (c) => {
@@ -109,6 +122,119 @@ publicRoutes.get("/api/recipes/:id", async (c) => {
   });
 });
 
+// ---- Demand-driven flow (Option A + B hybrid) -----------------------------
+
+// A. Suggestions: saran resep yang sudah published untuk query user yang miss.
+//    Zero-LLM — gratis dan instant (<50ms SQL).
+publicRoutes.post(
+  "/api/suggestions",
+  rateLimit({ bucket: "suggestions", limit: 20, windowSec: 3600 }),
+  async (c) => {
+    let body: { query?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "invalid_body" }, 400);
+    }
+    const query = (body.query ?? "").trim();
+    if (query.length < 2 || query.length > 100) {
+      return c.json({ success: false, error: "invalid_query" }, 400);
+    }
+    const suggestions = await findSuggestions(c.env.DB, query, 5);
+    return c.json({
+      success: true,
+      query,
+      count: suggestions.length,
+      suggestions: suggestions.map(({ score: _score, ...rest }) => rest),
+    });
+  },
+);
+
+// B. Auto-generate: user minta resep baru → langsung dispatch AI generation di background.
+// Response return cepat (<500ms) dengan requestId. Mobile polling /api/requests/:id tiap
+// 3-5 detik sampai status completed/failed. Total wall-clock ~15-45 detik.
+publicRoutes.post(
+  "/api/requests",
+  rateLimit({ bucket: "requests", limit: 5, windowSec: 3600 }),
+  async (c) => {
+    let body: { query?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ success: false, error: "invalid_body" }, 400);
+    }
+    const query = (body.query ?? "").trim();
+    if (query.length < 3 || query.length > 100) {
+      return c.json({ success: false, error: "invalid_query" }, 400);
+    }
+    const slug = slugifyQuery(query);
+    if (slug.length < 3) {
+      return c.json({ success: false, error: "invalid_query" }, 400);
+    }
+
+    // Dedup: kalau slug sudah ada di recipes & status published → return langsung.
+    const existingRecipe = await findRecipeById(c.env.DB, slug);
+    if (existingRecipe && existingRecipe.status === "published") {
+      return c.json({
+        success: true,
+        status: "already_exists",
+        recipeId: existingRecipe.id,
+        message: "Resep sudah tersedia di katalog.",
+      });
+    }
+    // Dedup: kalau ada job processing aktif → attach ke job itu (return requestId existing).
+    const existingReq = await findProcessingRequestBySlug(c.env.DB, slug);
+    if (existingReq) {
+      return c.json({
+        success: true,
+        status: "processing",
+        requestId: existingReq.id,
+        requestStatus: existingReq.status,
+        message: "Resep sedang dibuat. Tunggu sebentar ya.",
+      });
+    }
+
+    // Buat request baru + dispatch background job.
+    const id = randomId();
+    await createProcessingRequest(c.env.DB, {
+      id,
+      query,
+      slugTarget: slug,
+      clientIp: clientIp(c),
+    });
+    c.executionCtx.waitUntil(processGenerationRequest(c.env, id, query, slug));
+
+    return c.json(
+      {
+        success: true,
+        status: "processing",
+        requestId: id,
+        requestStatus: "processing",
+        message: "Resep sedang dibuat. Biasanya butuh 15-30 detik.",
+      },
+      202,
+    );
+  },
+);
+
+// B. Poll status request.
+publicRoutes.get("/api/requests/:id", async (c) => {
+  const id = c.req.param("id");
+  const req = await getRequest(c.env.DB, id);
+  if (!req) return c.json({ success: false, error: "not_found" }, 404);
+  return c.json({
+    success: true,
+    id: req.id,
+    status: req.status,
+    query: req.query,
+    slugTarget: req.slug_target,
+    requestedAt: req.requested_at,
+    completedAt: req.completed_at,
+    errorMessage: req.error_message,
+    recipeId: req.resulting_recipe_id,
+  });
+});
+
 // Healthcheck sederhana
 publicRoutes.get("/api/health", (c) => c.json({ ok: true, ts: Date.now() }));
 
@@ -130,4 +256,9 @@ publicRoutes.get("/api/images/recipes/:filename", async (c) => {
 
 function latestVersion(rows: { updated_at: number }[]): number {
   return rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), 0);
+}
+
+function randomId(): string {
+  // crypto.randomUUID tersedia di Workers runtime.
+  return crypto.randomUUID();
 }

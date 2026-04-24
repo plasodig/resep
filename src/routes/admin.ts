@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import {
   getRecipeFull,
+  listAllRequests,
   listRecipes,
   saveGeneratedContent,
   setImageKey,
@@ -14,6 +15,7 @@ import { uploadRecipeImage } from "../storage/kv";
 import type { Bindings, Category } from "../types";
 import { dashboardView } from "../views/dashboard";
 import { detailView } from "../views/detail";
+import { requestsView } from "../views/requests";
 
 export const adminRoutes = new Hono<{ Bindings: Bindings }>();
 
@@ -144,6 +146,14 @@ adminRoutes.post("/recipes/:id/unpublish", async (c) => {
   const id = c.req.param("id");
   await setStatus(c.env.DB, id, "generated");
   return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Resep di-unpublish.")}`);
+});
+
+// ---- Monitoring auto-generate requests (tanpa moderasi) --------------------
+
+adminRoutes.get("/requests", async (c) => {
+  const rows = await listAllRequests(c.env.DB, 100);
+  const flash = readFlash(c.req.query("ok"), c.req.query("err"));
+  return c.html(requestsView(rows, flash));
 });
 
 // ---- helpers ---------------------------------------------------------------

@@ -3,6 +3,7 @@
 import type {
   Category,
   GeneratedRecipeContent,
+  GenerationRequestRow,
   IngredientRow,
   RecipeFull,
   RecipeRow,
@@ -235,4 +236,117 @@ export async function syncRecipes(
   });
 
   return { added, skipped };
+}
+
+// ----- generation_requests -------------------------------------------------
+
+export function slugifyQuery(raw: string): string {
+  return raw
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export async function findRecipeById(
+  db: D1Database,
+  id: string,
+): Promise<RecipeRow | null> {
+  const row = await db.prepare(`SELECT * FROM recipes WHERE id = ?`).bind(id).first<RecipeRow>();
+  return row ?? null;
+}
+
+export async function createProcessingRequest(
+  db: D1Database,
+  req: {
+    id: string;
+    query: string;
+    slugTarget: string;
+    clientIp: string | null;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO generation_requests
+       (id, query, slug_target, status, client_ip, requested_at)
+       VALUES (?, ?, ?, 'processing', ?, ?)`,
+    )
+    .bind(req.id, req.query, req.slugTarget, req.clientIp, Date.now())
+    .run();
+}
+
+export async function getRequest(
+  db: D1Database,
+  id: string,
+): Promise<GenerationRequestRow | null> {
+  const row = await db
+    .prepare(`SELECT * FROM generation_requests WHERE id = ?`)
+    .bind(id)
+    .first<GenerationRequestRow>();
+  return row ?? null;
+}
+
+/**
+ * Cari request processing untuk slug yang sama → dedup supaya tidak spawn 2 job paralel
+ * untuk resep yang sama.
+ */
+export async function findProcessingRequestBySlug(
+  db: D1Database,
+  slug: string,
+): Promise<GenerationRequestRow | null> {
+  const row = await db
+    .prepare(
+      `SELECT * FROM generation_requests
+       WHERE slug_target = ? AND status = 'processing'
+       ORDER BY requested_at DESC
+       LIMIT 1`,
+    )
+    .bind(slug)
+    .first<GenerationRequestRow>();
+  return row ?? null;
+}
+
+export async function listAllRequests(
+  db: D1Database,
+  limit: number = 50,
+): Promise<GenerationRequestRow[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM generation_requests
+       ORDER BY requested_at DESC
+       LIMIT ?`,
+    )
+    .bind(limit)
+    .all<GenerationRequestRow>();
+  return results ?? [];
+}
+
+export async function markRequestCompleted(
+  db: D1Database,
+  id: string,
+  recipeId: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE generation_requests
+       SET status = 'completed', completed_at = ?, resulting_recipe_id = ?
+       WHERE id = ?`,
+    )
+    .bind(Date.now(), recipeId, id)
+    .run();
+}
+
+export async function markRequestFailed(
+  db: D1Database,
+  id: string,
+  errorMessage: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE generation_requests
+       SET status = 'failed', completed_at = ?, error_message = ?
+       WHERE id = ?`,
+    )
+    .bind(Date.now(), errorMessage, id)
+    .run();
 }

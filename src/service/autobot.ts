@@ -9,20 +9,21 @@ import {
 import { uploadRecipeImage } from "../storage/kv";
 import type { Bindings } from "../types";
 
+/**
+ * Cron tiap jam untuk proses draft dari bulk sync (GAS spreadsheet). Demand-driven
+ * requests dari user TIDAK di-pick oleh cron — mereka di-dispatch langsung via
+ * ctx.waitUntil di route POST /api/requests (lihat src/service/generator.ts).
+ */
 export async function autoProcessDrafts(env: Bindings): Promise<void> {
-    // 1. Ambil resep yang masih draft
     const { results: drafts } = await env.DB.prepare(
-        "SELECT id FROM recipes WHERE status = 'draft' LIMIT 1"
+        "SELECT id FROM recipes WHERE status = 'draft' LIMIT 1",
     ).all<{ id: string }>();
 
     if (!drafts || drafts.length === 0) {
-        console.log("Autobot: Tidak ada resep draft untuk di-generate.");
+        console.log("Autobot: Tidak ada draft untuk diproses.");
         return;
     }
 
-    console.log(`Autobot: Memproses ${drafts.length} resep draft...`);
-
-    // 2. Siapkan pool AI
     const pool = await getAccountPool(env.IMAGES, env.AI_POOL_URL, env.ACCOUNT_POOL_JSON);
     console.log(`Autobot: Pool AI siap dengan ${pool.length} akun.`);
 
@@ -32,20 +33,14 @@ export async function autoProcessDrafts(env: Bindings): Promise<void> {
             const full = await getRecipeFull(env.DB, draft.id, "");
             if (!full) continue;
 
-            // Jalankan paralel (Teks + Gambar)
             const [text, image] = await Promise.all([
                 generateRecipe(new PoolIterator(pool), full.recipe.title, full.recipe.category),
                 generateImage(new PoolIterator(pool), full.recipe.title, full.recipe.category),
             ]);
 
-            // Simpan teks
             await saveGeneratedContent(env.DB, draft.id, text);
-
-            // Simpan gambar ke KV
             const key = await uploadRecipeImage(env.IMAGES, draft.id, image);
             await setImageKey(env.DB, draft.id, key);
-
-            // Otomatis PUBLISH!
             await setStatus(env.DB, draft.id, "published");
 
             console.log(`Autobot: SUCCESS ${draft.id} published.`);

@@ -2,7 +2,10 @@ import { html } from "hono/html";
 import type { RecipeRow } from "../types";
 import { layout } from "./layout";
 
-export function dashboardView(rows: RecipeRow[], flash?: { kind: "ok" | "error"; msg: string }) {
+export function dashboardView(
+  rows: RecipeRow[],
+  flash?: { kind: "ok" | "error"; msg: string },
+) {
   const counts = {
     draft: rows.filter((r) => r.status === "draft").length,
     generated: rows.filter((r) => r.status === "generated").length,
