@@ -124,7 +124,10 @@ adminRoutes.post("/recipes/:id/generate-all", async (c) => {
   if (errors.length > 0) {
     return c.redirect(`/admin/recipes/${id}?err=${encodeURIComponent(errors.join(" | "))}`);
   }
-  return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Teks + gambar selesai di-generate.")}`);
+
+  // Otomatis publish jika sukses
+  await setStatus(c.env.DB, id, "published");
+  return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Teks + gambar selesai di-generate dan otomatis di-publish.")}`);
 });
 
 adminRoutes.post("/recipes/:id/publish", async (c) => {
