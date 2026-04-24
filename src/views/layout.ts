@@ -12,9 +12,10 @@ export function layout(title: string, body: HtmlEscapedString | Promise<HtmlEsca
 </head>
 <body>
   <header class="topbar">
-    <a href="/" class="brand">Resep Dashboard</a>
+    <a href="/admin" class="brand">Resep Dashboard</a>
     <nav>
-      <a href="/">Daftar</a>
+      <a href="/admin">Daftar</a>
+      <a href="/" target="_blank" rel="noopener">Landing Page</a>
       <a href="/api/recipes" target="_blank" rel="noopener">API publik</a>
       <form method="post" action="/logout" style="display:inline">
         <button type="submit" class="link">Logout</button>

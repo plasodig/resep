@@ -24,10 +24,10 @@ export function dashboardView(rows: RecipeRow[], flash?: { kind: "ok" | "error";
         <span><span class="badge badge-published">published</span> ${counts.published}</span>
       </div>
       <div class="actions">
-        <form method="post" action="/sync">
+        <form method="post" action="/admin/sync">
           <button class="btn" type="submit">🔄 Sinkronisasi Judul</button>
         </form>
-        <form method="post" action="/autobot/run">
+        <form method="post" action="/admin/autobot/run">
           <button class="btn btn-primary" type="submit">⚡ Generate All (Background)</button>
         </form>
       </div>
@@ -48,16 +48,16 @@ export function dashboardView(rows: RecipeRow[], flash?: { kind: "ok" | "error";
         ${rows.map(
         (r) => html`
             <tr>
-              <td><a href="/recipes/${r.id}"><strong>${r.title}</strong></a></td>
+              <td><a href="/admin/recipes/${r.id}"><strong>${r.title}</strong></a></td>
               <td>${r.category}</td>
               <td><span class="badge badge-${r.status}">${r.status}</span></td>
               <td>${r.image_key ? "✓" : "—"}</td>
               <td class="small">${formatTime(r.updated_at)}</td>
               <td>
                 <div class="row-actions">
-                  <a class="btn" href="/recipes/${r.id}">Detail</a>
+                  <a class="btn" href="/admin/recipes/${r.id}">Detail</a>
                   ${r.status === "draft"
-            ? html`<form class="inline" method="post" action="/recipes/${r.id}/generate-all">
+            ? html`<form class="inline" method="post" action="/admin/recipes/${r.id}/generate-all">
                         <button class="btn btn-primary" type="submit">Generate</button>
                       </form>`
             : ""}

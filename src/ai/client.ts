@@ -5,9 +5,9 @@ import type { GeneratedImageBytes, GeneratedRecipeContent } from "../types";
 import { type AccountSlot, PoolIterator, QuotaExhaustedError } from "./pool";
 import { SYSTEM_RECIPE, imagePrompt, userPromptRecipe } from "./prompts";
 
-const PRIMARY_TEXT_MODEL = "@cf/mistralai/mistral-small-3.1-24b-instruct";
-const FALLBACK_TEXT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
-const IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+const PRIMARY_TEXT_MODEL = "@cf/meta/llama-3-8b-instruct";
+const FALLBACK_TEXT_MODEL = "@cf/meta/llama-2-7b-chat-int8";
+const IMAGE_MODEL = "@cf/stabilityai/stable-diffusion-xl-base-1.0";
 const MAX_ATTEMPTS = 4;
 
 interface CfEnvelope<T> {
@@ -171,7 +171,12 @@ export async function generateImage(
   title: string,
   category: string,
 ): Promise<GeneratedImageBytes> {
-  const body = { prompt: imagePrompt(title, category), steps: 4 };
+  const body = { 
+    prompt: imagePrompt(title, category), 
+    steps: 20,
+    width: 512,
+    height: 512
+  };
   return await runWithRotation(pool, IMAGE_MODEL, body, async (res) => {
     const ct = res.headers.get("Content-Type") ?? "";
     let bytes: ArrayBuffer;

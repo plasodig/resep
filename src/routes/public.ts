@@ -1,14 +1,32 @@
-// Endpoint publik untuk mobile app. Hanya expose status='published'.
-// CORS terbuka — mobile app native tidak terkena CORS, tapi web browser test bisa akses.
-
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getRecipeFull, imageUrlFor, listPublishedRecipes } from "../db";
 import type { Bindings } from "../types";
+import { landingPage, recipeDetailPage } from "../views/landing";
 
 export const publicRoutes = new Hono<{ Bindings: Bindings }>();
 
 publicRoutes.use("/api/*", cors({ origin: "*", allowMethods: ["GET"] }));
+
+// ── Landing Page Publik ──
+publicRoutes.get("/", async (c) => {
+  const rows = await listPublishedRecipes(c.env.DB);
+  return c.html(landingPage(rows));
+});
+
+publicRoutes.get("/resep", async (c) => {
+  const rows = await listPublishedRecipes(c.env.DB);
+  return c.html(landingPage(rows));
+});
+
+publicRoutes.get("/resep/:id", async (c) => {
+  const id = c.req.param("id");
+  const full = await getRecipeFull(c.env.DB, id, "");
+  if (!full || full.recipe.status !== "published") {
+    return c.redirect("/resep");
+  }
+  return c.html(recipeDetailPage(full));
+});
 
 // Manifest ringan: list semua resep published, tanpa ingredients/steps (hemat bandwidth).
 // Mobile app pakai ini untuk render list, lalu fetch detail saat user buka.

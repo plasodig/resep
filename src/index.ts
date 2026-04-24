@@ -19,10 +19,15 @@ const app = new Hono<{ Bindings: Bindings }>();
 
 app.use("*", logger());
 
+// Public routes (landing page, API, images) — no auth
 app.route("/", publicRoutes);
+
+// Auth routes (/login, /logout)
 app.route("/", authRoutes);
-app.use("*", requireAuth);
-app.route("/", adminRoutes);
+
+// Admin dashboard — requires auth, mounted under /admin
+app.use("/admin/*", requireAuth);
+app.route("/admin", adminRoutes);
 
 app.notFound((c) => c.text("Not found", 404));
 app.onError((err, c) => {

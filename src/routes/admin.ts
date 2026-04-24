@@ -31,16 +31,16 @@ adminRoutes.post("/sync", async (c) => {
     if (!res.ok) throw new Error(`GAS returned ${res.status}`);
     const data = await res.json() as any[];
     const result = await syncRecipes(c.env.DB, data);
-    return c.redirect(`/?ok=${encodeURIComponent(`Sync berhasil: ${result.added} resep baru ditambahkan.`)}`);
+    return c.redirect(`/admin?ok=${encodeURIComponent(`Sync berhasil: ${result.added} resep baru ditambahkan.`)}`);
   } catch (e) {
-    return c.redirect(`/?err=${encodeURIComponent(errMsg("Sync gagal", e))}`);
+    return c.redirect(`/admin?err=${encodeURIComponent(errMsg("Sync gagal", e))}`);
   }
 });
 
 adminRoutes.post("/autobot/run", async (c) => {
   // Jalankan di background supaya browser bisa langsung di-close
   c.executionCtx.waitUntil(autoProcessDrafts(c.env));
-  return c.redirect("/?ok=" + encodeURIComponent("Autobot dijalankan di background server. Proses akan berjalan otomatis."));
+  return c.redirect("/admin?ok=" + encodeURIComponent("Autobot dijalankan di background server. Proses akan berjalan otomatis."));
 });
 
 adminRoutes.get("/recipes/:id", async (c) => {
@@ -63,7 +63,7 @@ adminRoutes.post("/recipes/:id/update", async (c) => {
     servings: int(form.servings, 4),
     tagsCsv: normalizeTags(str(form.tags_csv)),
   });
-  return c.redirect(`/recipes/${id}?ok=${encodeURIComponent("Metadata disimpan.")}`);
+  return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Metadata disimpan.")}`);
 });
 
 adminRoutes.post("/recipes/:id/generate-text", async (c) => {
@@ -75,9 +75,9 @@ adminRoutes.post("/recipes/:id/generate-text", async (c) => {
     const pool = new PoolIterator(slots);
     const content = await generateRecipe(pool, full.recipe.title, full.recipe.category);
     await saveGeneratedContent(c.env.DB, id, content);
-    return c.redirect(`/recipes/${id}?ok=${encodeURIComponent("Teks resep berhasil di-generate.")}`);
+    return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Teks resep berhasil di-generate.")}`);
   } catch (e) {
-    return c.redirect(`/recipes/${id}?err=${encodeURIComponent(errMsg("Generate teks gagal", e))}`);
+    return c.redirect(`/admin/recipes/${id}?err=${encodeURIComponent(errMsg("Generate teks gagal", e))}`);
   }
 });
 
@@ -91,9 +91,9 @@ adminRoutes.post("/recipes/:id/generate-image", async (c) => {
     const image = await generateImage(pool, full.recipe.title, full.recipe.category);
     const key = await uploadRecipeImage(c.env.IMAGES, id, image);
     await setImageKey(c.env.DB, id, key);
-    return c.redirect(`/recipes/${id}?ok=${encodeURIComponent("Gambar berhasil di-generate.")}`);
+    return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Gambar berhasil di-generate.")}`);
   } catch (e) {
-    return c.redirect(`/recipes/${id}?err=${encodeURIComponent(errMsg("Generate gambar gagal", e))}`);
+    return c.redirect(`/admin/recipes/${id}?err=${encodeURIComponent(errMsg("Generate gambar gagal", e))}`);
   }
 });
 
@@ -122,21 +122,21 @@ adminRoutes.post("/recipes/:id/generate-all", async (c) => {
   if (imageResult.status === "rejected") errors.push(errMsg("gambar", imageResult.reason));
 
   if (errors.length > 0) {
-    return c.redirect(`/recipes/${id}?err=${encodeURIComponent(errors.join(" | "))}`);
+    return c.redirect(`/admin/recipes/${id}?err=${encodeURIComponent(errors.join(" | "))}`);
   }
-  return c.redirect(`/recipes/${id}?ok=${encodeURIComponent("Teks + gambar selesai di-generate.")}`);
+  return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Teks + gambar selesai di-generate.")}`);
 });
 
 adminRoutes.post("/recipes/:id/publish", async (c) => {
   const id = c.req.param("id");
   await setStatus(c.env.DB, id, "published");
-  return c.redirect(`/recipes/${id}?ok=${encodeURIComponent("Resep di-publish.")}`);
+  return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Resep di-publish.")}`);
 });
 
 adminRoutes.post("/recipes/:id/unpublish", async (c) => {
   const id = c.req.param("id");
   await setStatus(c.env.DB, id, "generated");
-  return c.redirect(`/recipes/${id}?ok=${encodeURIComponent("Resep di-unpublish.")}`);
+  return c.redirect(`/admin/recipes/${id}?ok=${encodeURIComponent("Resep di-unpublish.")}`);
 });
 
 // ---- helpers ---------------------------------------------------------------

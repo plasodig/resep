@@ -5,7 +5,7 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 [triggers]
-crons = ["0 * * * *"]
+crons = ["0 * * * *"] # Run every hour
 
 [[routes]]
 pattern = "resep.plasodig.my.id"

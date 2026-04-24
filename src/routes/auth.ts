@@ -6,7 +6,7 @@ import { loginView } from "../views/login";
 export const authRoutes = new Hono<{ Bindings: Bindings }>();
 
 authRoutes.get("/login", async (c) => {
-  if (await isAuthenticated(c)) return c.redirect("/");
+  if (await isAuthenticated(c)) return c.redirect("/admin");
   return c.html(loginView());
 });
 
@@ -20,7 +20,7 @@ authRoutes.post("/login", async (c) => {
     return c.html(loginView("Password salah."), 401);
   }
   await createSession(c);
-  return c.redirect("/");
+  return c.redirect("/admin");
 });
 
 authRoutes.post("/logout", (c) => {

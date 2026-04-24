@@ -21,7 +21,7 @@ export function detailView(
   const tags = r.tags_csv ? r.tags_csv.split(",").map((t) => t.trim()).filter(Boolean) : [];
 
   const body = html`
-    <p><a href="/">← Daftar resep</a></p>
+    <p><a href="/admin">← Daftar resep</a></p>
     <h1>${r.title}</h1>
 
     <div class="meta-row">
@@ -39,22 +39,22 @@ export function detailView(
     <div class="panel">
       <h2>Aksi</h2>
       <div class="actions">
-        <form class="inline" method="post" action="/recipes/${r.id}/generate-text">
+        <form class="inline" method="post" action="/admin/recipes/${r.id}/generate-text">
           <button class="btn" type="submit">${r.generated_at ? "Regenerate teks" : "Generate teks"}</button>
         </form>
-        <form class="inline" method="post" action="/recipes/${r.id}/generate-image">
+        <form class="inline" method="post" action="/admin/recipes/${r.id}/generate-image">
           <button class="btn" type="submit">${r.image_key ? "Regenerate gambar" : "Generate gambar"}</button>
         </form>
-        <form class="inline" method="post" action="/recipes/${r.id}/generate-all">
+        <form class="inline" method="post" action="/admin/recipes/${r.id}/generate-all">
           <button class="btn btn-primary" type="submit">Generate keduanya</button>
         </form>
         ${r.status !== "published" && r.generated_at && r.image_key
-          ? html`<form class="inline" method="post" action="/recipes/${r.id}/publish">
+          ? html`<form class="inline" method="post" action="/admin/recipes/${r.id}/publish">
               <button class="btn btn-primary" type="submit">Publish</button>
             </form>`
           : ""}
         ${r.status === "published"
-          ? html`<form class="inline" method="post" action="/recipes/${r.id}/unpublish">
+          ? html`<form class="inline" method="post" action="/admin/recipes/${r.id}/unpublish">
               <button class="btn btn-danger" type="submit">Unpublish</button>
             </form>`
           : ""}
@@ -73,7 +73,7 @@ export function detailView(
 
     <div class="panel">
       <h2>Metadata (boleh edit manual)</h2>
-      <form method="post" action="/recipes/${r.id}/update">
+      <form method="post" action="/admin/recipes/${r.id}/update">
         <label>Judul</label>
         <input type="text" name="title" value="${r.title}" required />
         <div class="grid" style="margin-top: 12px">
