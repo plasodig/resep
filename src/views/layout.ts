@@ -16,8 +16,9 @@ export function layout(title: string, body: HtmlEscapedString | Promise<HtmlEsca
     <nav>
       <a href="/admin">Daftar</a>
       <a href="/admin/requests">Permintaan</a>
-      <a href="/" target="_blank" rel="noopener">Landing Page</a>
-      <a href="/api/recipes" target="_blank" rel="noopener">API publik</a>
+      <a href="/admin/reports">Laporan</a>
+      <a href="/" target="_blank" rel="noopener">Landing</a>
+      <a href="/api/recipes" target="_blank" rel="noopener">API</a>
       <form method="post" action="/logout" style="display:inline">
         <button type="submit" class="link">Logout</button>
       </form>

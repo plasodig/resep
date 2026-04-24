@@ -11,12 +11,13 @@ CREATE TABLE IF NOT EXISTS recipes (
     cooking_time_minutes  INTEGER NOT NULL DEFAULT 30,
     servings              INTEGER NOT NULL DEFAULT 4,
     tags_csv              TEXT NOT NULL DEFAULT '',   -- "minang,pedas,gurih"
-    image_key             TEXT,                       -- R2 object key, mis. "recipes/nasi-goreng.png"
+    image_key             TEXT,                       -- KV object key
     status                TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','generated','published')),
     generated_at          INTEGER,                    -- epoch ms terakhir generate teks
     image_generated_at    INTEGER,                    -- epoch ms terakhir generate image
     published_at          INTEGER,                    -- epoch ms publish
-    updated_at            INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    updated_at            INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+    report_count          INTEGER NOT NULL DEFAULT 0  -- auto-unpublish threshold
 );
 
 CREATE INDEX IF NOT EXISTS idx_recipes_status ON recipes(status);
@@ -60,3 +61,16 @@ CREATE INDEX IF NOT EXISTS idx_requests_status
     ON generation_requests(status, requested_at);
 CREATE INDEX IF NOT EXISTS idx_requests_slug
     ON generation_requests(slug_target);
+
+-- In-app user reports (Google Play UGC & Generative AI compliance).
+CREATE TABLE IF NOT EXISTS recipe_reports (
+    id          TEXT PRIMARY KEY,
+    recipe_id   TEXT NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+    reason      TEXT NOT NULL,
+    detail      TEXT NOT NULL DEFAULT '',
+    client_ip   TEXT,
+    created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_recipe  ON recipe_reports(recipe_id);
+CREATE INDEX IF NOT EXISTS idx_reports_created ON recipe_reports(created_at DESC);

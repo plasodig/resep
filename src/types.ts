@@ -39,6 +39,18 @@ export interface RecipeRow {
   image_generated_at: number | null;
   published_at: number | null;
   updated_at: number;
+  report_count: number;
+}
+
+export type ReportReason = "inaccurate" | "offensive" | "dangerous" | "other";
+
+export interface RecipeReportRow {
+  id: string;
+  recipe_id: string;
+  reason: ReportReason;
+  detail: string;
+  client_ip: string | null;
+  created_at: number;
 }
 
 export interface IngredientRow {

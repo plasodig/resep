@@ -6,10 +6,15 @@ import type {
   GenerationRequestRow,
   IngredientRow,
   RecipeFull,
+  RecipeReportRow,
   RecipeRow,
   RecipeStatus,
+  ReportReason,
   StepRow,
 } from "./types";
+
+/** Ambang auto-unpublish: kalau recipe punya >= N reports, set status ke 'generated'. */
+export const REPORT_UNPUBLISH_THRESHOLD = 3;
 
 export async function listRecipes(db: D1Database): Promise<RecipeRow[]> {
   const { results } = await db
@@ -349,4 +354,73 @@ export async function markRequestFailed(
     )
     .bind(Date.now(), errorMessage, id)
     .run();
+}
+
+// ----- recipe_reports ------------------------------------------------------
+
+/**
+ * Simpan satu report user + increment counter di recipes. Kalau setelah increment
+ * count >= threshold, auto-unpublish (set status='generated'). Return status terbaru.
+ */
+export async function createReport(
+  db: D1Database,
+  req: {
+    id: string;
+    recipeId: string;
+    reason: ReportReason;
+    detail: string;
+    clientIp: string | null;
+  },
+): Promise<{ reportCount: number; unpublished: boolean }> {
+  const now = Date.now();
+  await db.batch([
+    db
+      .prepare(
+        `INSERT INTO recipe_reports (id, recipe_id, reason, detail, client_ip, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(req.id, req.recipeId, req.reason, req.detail, req.clientIp, now),
+    db
+      .prepare(`UPDATE recipes SET report_count = report_count + 1 WHERE id = ?`)
+      .bind(req.recipeId),
+  ]);
+
+  const row = await db
+    .prepare(`SELECT report_count, status FROM recipes WHERE id = ?`)
+    .bind(req.recipeId)
+    .first<{ report_count: number; status: string }>();
+  const reportCount = row?.report_count ?? 0;
+
+  let unpublished = false;
+  if (row?.status === "published" && reportCount >= REPORT_UNPUBLISH_THRESHOLD) {
+    await db
+      .prepare(`UPDATE recipes SET status = 'generated', updated_at = ? WHERE id = ?`)
+      .bind(now, req.recipeId)
+      .run();
+    unpublished = true;
+  }
+
+  return { reportCount, unpublished };
+}
+
+export type ReportWithRecipe = RecipeReportRow & {
+  recipe_title: string | null;
+  recipe_status: string | null;
+};
+
+export async function listRecentReports(
+  db: D1Database,
+  limit: number = 50,
+): Promise<ReportWithRecipe[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT r.*, recipes.title AS recipe_title, recipes.status AS recipe_status
+       FROM recipe_reports r
+       LEFT JOIN recipes ON recipes.id = r.recipe_id
+       ORDER BY r.created_at DESC
+       LIMIT ?`,
+    )
+    .bind(limit)
+    .all<ReportWithRecipe>();
+  return results ?? [];
 }

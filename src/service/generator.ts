@@ -21,6 +21,7 @@ import {
 } from "../db";
 import { uploadRecipeImage } from "../storage/kv";
 import type { Bindings, Category } from "../types";
+import { validateFoodQuery, validateGeneratedContent } from "./contentSafety";
 
 /**
  * Ubah query jadi Title Case. "mie kudus" → "Mie Kudus"
@@ -40,6 +41,15 @@ export async function processGenerationRequest(
     slug: string,
 ): Promise<void> {
     console.log(`[generator=${requestId}] START slug=${slug} query="${query}"`);
+
+    // Pre-check 1: query safety — blocklist NSFW/senjata/obat/medis. Cepat & gratis.
+    const queryCheck = validateFoodQuery(query);
+    if (!queryCheck.ok) {
+        console.warn(`[generator=${requestId}] REJECTED query safety: ${queryCheck.reason}`);
+        await markRequestFailed(env.DB, requestId, queryCheck.reason ?? "Query tidak valid");
+        return;
+    }
+
     const title = prettifyQuery(query);
     const category: Category = "MainCourse"; // default — admin bisa edit di dashboard
 
@@ -65,6 +75,18 @@ export async function processGenerationRequest(
             generateRecipe(new PoolIterator(pool), effectiveTitle, effectiveCategory),
             generateImage(new PoolIterator(pool), effectiveTitle, effectiveCategory),
         ]);
+
+        // Pre-check 2: kalau AI tolak (system prompt "not_food"), description kemungkinan
+        // kosong atau ingredients/steps kosong → validator akan catch.
+        // Pre-check 3: post-generation safety — tolak kalau mengandung klaim medis.
+        const contentCheck = validateGeneratedContent(text);
+        if (!contentCheck.ok) {
+            console.warn(
+                `[generator=${requestId}] REJECTED content safety: ${contentCheck.reason}`,
+            );
+            await markRequestFailed(env.DB, requestId, contentCheck.reason ?? "Konten ditolak");
+            return;
+        }
 
         // 4. Persist konten + gambar.
         await saveGeneratedContent(env.DB, slug, text);
